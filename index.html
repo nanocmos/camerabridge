@@ -1,86 +1,74 @@
 <script>
-    // ประกาศตัวแปรไว้ด้านบนเพื่อความสะดวกในการเรียกใช้ข้ามฟังก์ชัน
+    // ประกาศตัวแปรไว้ด้านบนเพื่อให้ทุกฟังก์ชันเข้าถึงได้
     let GAS_URL = "";
     let sheetName = "";
     let dateStr = "";
 
     async function initCamera() {
-        // 1. ดึงค่าจาก URL Parameters
         const urlParams = new URLSearchParams(window.location.search);
         sheetName = urlParams.get('sheet') || 'ไม่ระบุชื่อเตา';
         dateStr = urlParams.get('date') || '';
         GAS_URL = urlParams.get('gas_url');
 
-        // 2. ตรวจสอบและใส่ค่าใน UI (ทำหลังจาก DOM โหลดเสร็จแน่นอน)
+        // แสดงชื่อเตาบนหน้าจอ
         const displayElem = document.getElementById('displaySheet');
-        if (displayElem) {
-            displayElem.innerText = sheetName;
-        }
+        if (displayElem) displayElem.innerText = sheetName;
 
-        const statusElem = document.getElementById('status');
-        if (statusElem) {
-            statusElem.innerText = "กำลังเปิดกล้อง...";
-        }
-
-        // 3. เริ่มการตั้งค่ากล้องหลัง
         try {
             const constraints = {
-                video: {
-                    facingMode: { ideal: "environment" },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                },
+                video: { facingMode: { ideal: "environment" } },
                 audio: false
             };
-
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            const videoElement = document.getElementById('video');
-            if (videoElement) {
-                videoElement.srcObject = stream;
-                if (statusElem) statusElem.innerText = "กล้องพร้อมใช้งาน (กล้องหลัง)";
-            }
+            const video = document.getElementById('video');
+            if (video) video.srcObject = stream;
+            
+            const statusElem = document.getElementById('status');
+            if (statusElem) statusElem.innerText = "กล้องพร้อมใช้งาน (กล้องหลัง)";
         } catch (err) {
-            console.error("Camera Error:", err);
-            if (statusElem) statusElem.innerText = "ไม่สามารถเข้าถึงกล้องได้: " + err.message;
+            console.error(err);
+            document.getElementById('status').innerText = "ไม่สามารถเปิดกล้องได้";
         }
     }
 
-    // ฟังก์ชันสำหรับปุ่มถ่ายรูป
-    document.getElementById('captureBtn').onclick = async () => {
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const statusElem = document.getElementById('status');
-        
-        if (!video || !video.videoWidth || !GAS_URL) {
-            alert("ไม่สามารถถ่ายรูปได้เนื่องจากกล้องไม่พร้อมหรือไม่มี GAS URL");
-            return;
-        }
+    // --- ส่วนที่แก้ไข: หุ้มด้วย window.onload ---
+    window.onload = function() {
+        // เริ่มต้นกล้อง
+        initCamera();
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        
-        const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-        if (statusElem) statusElem.innerText = "⏳ กำลังบันทึกลง Google Drive...";
+        // กำหนดปุ่มคลิก (ตอนนี้ปุ่มจะถูกโหลดขึ้นมาจริงๆ แล้ว ไม่เป็น null แน่นอน)
+        const btn = document.getElementById('captureBtn');
+        if (btn) {
+            btn.onclick = async function() {
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                const statusElem = document.getElementById('status');
+                
+                if (!video || !GAS_URL) return;
 
-        try {
-            await fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify({
-                    image: imageData,
-                    sheetName: sheetName,
-                    dateStr: dateStr
-                })
-            });
-            if (statusElem) statusElem.innerText = "✅ บันทึกสำเร็จ!";
-            alert("บันทึกรูปภาพเรียบร้อย");
-        } catch (e) {
-            if (statusElem) statusElem.innerText = "❌ เกิดข้อผิดพลาดในการส่งข้อมูล";
-            console.error(e);
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                if (statusElem) statusElem.innerText = "⏳ กำลังบันทึก...";
+
+                try {
+                    await fetch(GAS_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            image: imageData,
+                            sheetName: sheetName,
+                            dateStr: dateStr
+                        })
+                    });
+                    if (statusElem) statusElem.innerText = "✅ บันทึกสำเร็จ!";
+                    alert("บันทึกรูปภาพเรียบร้อย");
+                } catch (e) {
+                    if (statusElem) statusElem.innerText = "❌ เกิดข้อผิดพลาด";
+                }
+            };
         }
     };
-
-    // เรียกใช้งานเมื่อโหลดหน้าเว็บเสร็จ
-    window.addEventListener('DOMContentLoaded', initCamera);
 </script>
