@@ -26,11 +26,41 @@
 
         const GAS_URL = "YOUR_GAS_EXEC_URL"; // Paste your /exec URL here
 
-        async function initCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            document.getElementById('video').srcObject = stream;
-        }
+async function initCamera() {
+    try {
+        // --- ส่วนที่แก้ไข ---
+        // เปลี่ยนเป็นกล้องหลังโดยระบุ facingMode เป็น "environment"
+        // และเพิ่ม constraint ideal สำหรับวิดีโอเพื่อให้ได้ความละเอียดที่ดี
+        const constraints = {
+            video: {
+                facingMode: { ideal: "environment" }, // บังคับใช้กล้องหลัง (ถ้ามี)
+                width: { ideal: 1280 }, // กำหนดความละเอียดวิดีโอตามต้องการ
+                height: { ideal: 720 }
+            },
+            audio: false // ปิดเสียง (ถ้าไม่จำเป็น)
+        };
 
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        // --- จบส่วนที่แก้ไข ---
+
+        const videoElement = document.getElementById('video');
+        if (videoElement) {
+            videoElement.srcObject = stream;
+        } else {
+            console.error("ไม่พบบุคคล <video> ที่มี id 'video'");
+        }
+    } catch (err) {
+        console.error("ไม่สามารถเข้าถึงกล้องได้: ", err);
+        // แสดงข้อความแจ้งเตือนผู้ใช้ (เช่น ผ่าน SweetAlert2)
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'error',
+                title: 'ไม่สามารถเปิดกล้องได้',
+                text: 'โปรดตรวจสอบสิทธิ์การเข้าถึงกล้องในเบราว์เซอร์ของคุณ'
+            });
+        }
+    }
+}
         document.getElementById('captureBtn').onclick = async () => {
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
