@@ -5,7 +5,7 @@
     const dateStr = urlParams.get('date') || '';
     
     // --- ส่วนที่แก้ไข: ดึง GAS_URL จาก Parameter ---
-    const urlParams = new URLSearchParams(window.location.search);
+    
 const GAS_URL = urlParams.get('gas_url'); // จะได้รับค่าอัตโนมัติจาก Dashboard
     
     document.getElementById('displaySheet').innerText = sheetName;
