@@ -1,90 +1,135 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
+    <meta charset="UTF-8">
     <title>Biochar Camera Bridge</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { background-color: #1a1a1a; }
+        #video { 
+            width: 100%; 
+            max-width: 500px; 
+            border-radius: 15px; 
+            background: #000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            /* กลับด้านภาพเฉพาะกล้องหน้า แต่ถ้ากล้องหลังไม่ต้องกลับ (ปกติเบราว์เซอร์จัดการให้) */
+        }
+        .status-text { font-size: 0.9rem; min-height: 24px; }
+    </style>
 </head>
-<body class="bg-dark text-white text-center">
-    <div class="container py-5">
-        <h4>ถ่ายรูปสำหรับเตา: <span id="displaySheet"></span></h4>
-        <video id="video" autoplay playsinline class="w-100 rounded mb-3" style="max-width: 500px; background: #000;"></video>
+<body class="text-white text-center">
+    <div class="container py-4">
+        <div class="mb-3">
+            <h4 class="mb-1">ถ่ายรูปสำหรับเตา</h4>
+            <span id="displaySheet" class="badge bg-primary fs-6">กำลังโหลด...</span>
+        </div>
+
+        <video id="video" autoplay playsinline></video>
         <canvas id="canvas" style="display:none;"></canvas>
         
-        <div class="d-grid gap-2 col-8 mx-auto">
-            <button id="captureBtn" class="btn btn-danger btn-lg rounded-pill">ถ่ายรูปและบันทึก</button>
-            <button onclick="window.close()" class="btn btn-outline-light">กลับหน้าหลัก</button>
+        <div id="status" class="status-text my-3 text-info">กำลังเปิดกล้อง...</div>
+
+        <div class="d-grid gap-3 col-10 col-md-6 mx-auto">
+            <button id="captureBtn" class="btn btn-danger btn-lg rounded-pill shadow">
+                <i class="fa-solid fa-camera"></i> ถ่ายรูปและบันทึก
+            </button>
+            <button onclick="window.close()" class="btn btn-outline-light rounded-pill">
+                กลับหน้าหลัก
+            </button>
         </div>
-        <p id="status" class="mt-3"></p>
     </div>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const sheetName = urlParams.get('sheet');
-        const dateStr = urlParams.get('date');
+        const sheetName = urlParams.get('sheet') || 'ไม่ระบุชื่อเตา';
+        const dateStr = urlParams.get('date') || '';
         document.getElementById('displaySheet').innerText = sheetName;
 
-        const GAS_URL = "YOUR_GAS_EXEC_URL"; // Paste your /exec URL here
+        // *** สำคัญ: วาง URL ของ Google Apps Script Web App ที่นี่ ***
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyuy7frjckSWOym8tS5baTryWCwOfnDILGfVVckuMxtSaRcoNORFDfzoxdBOCZ6yNCFew/exec"; 
 
-async function initCamera() {
-    try {
-        // --- ส่วนที่แก้ไข ---
-        // เปลี่ยนเป็นกล้องหลังโดยระบุ facingMode เป็น "environment"
-        // และเพิ่ม constraint ideal สำหรับวิดีโอเพื่อให้ได้ความละเอียดที่ดี
-        const constraints = {
-            video: {
-                facingMode: { ideal: "environment" }, // บังคับใช้กล้องหลัง (ถ้ามี)
-                width: { ideal: 1280 }, // กำหนดความละเอียดวิดีโอตามต้องการ
-                height: { ideal: 720 }
-            },
-            audio: false // ปิดเสียง (ถ้าไม่จำเป็น)
-        };
+        let stream = null;
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        // --- จบส่วนที่แก้ไข ---
+        async function initCamera() {
+            try {
+                // ตั้งค่าเรียกใช้กล้องหลัง
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: "environment" }, // บังคับกล้องหลัง
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
 
-        const videoElement = document.getElementById('video');
-        if (videoElement) {
-            videoElement.srcObject = stream;
-        } else {
-            console.error("ไม่พบบุคคล <video> ที่มี id 'video'");
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const videoElement = document.getElementById('video');
+                videoElement.srcObject = stream;
+                document.getElementById('status').innerText = "กล้องพร้อมใช้งาน (กล้องหลัง)";
+            } catch (err) {
+                console.error("Camera Error:", err);
+                document.getElementById('status').innerText = "";
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ไม่สามารถเปิดกล้องได้',
+                    text: 'กรุณาอนุญาตให้เข้าถึงกล้อง หรือตรวจสอบว่าไม่มีแอปอื่นใช้งานกล้องอยู่',
+                    confirmButtonColor: '#d33'
+                });
+            }
         }
-    } catch (err) {
-        console.error("ไม่สามารถเข้าถึงกล้องได้: ", err);
-        // แสดงข้อความแจ้งเตือนผู้ใช้ (เช่น ผ่าน SweetAlert2)
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                icon: 'error',
-                title: 'ไม่สามารถเปิดกล้องได้',
-                text: 'โปรดตรวจสอบสิทธิ์การเข้าถึงกล้องในเบราว์เซอร์ของคุณ'
-            });
-        }
-    }
-}
+
         document.getElementById('captureBtn').onclick = async () => {
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
+            const statusLabel = document.getElementById('status');
+            
+            if (!video.srcObject) return;
+
+            // วาดภาพจากวิดีโอลง Canvas
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
             
-            const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
-            document.getElementById('status').innerText = "กำลังบันทึก...";
+            // แปลงเป็น Base64
+            const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            
+            statusLabel.innerText = "⏳ กำลังบันทึกลง Google Drive...";
+            document.getElementById('captureBtn').disabled = true;
 
-            fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify({
-                    image: imageData,
-                    sheetName: sheetName,
-                    dateStr: dateStr
-                })
-            }).then(() => {
-                document.getElementById('status').innerText = "บันทึกสำเร็จ! คุณสามารถปิดหน้านี้ได้";
-                alert("บันทึกรูปภาพเรียบร้อย");
-            });
+            try {
+                // ส่งข้อมูลไปยัง Google Apps Script (doPost)
+                await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // จำเป็นสำหรับ GAS
+                    body: JSON.stringify({
+                        image: imageData,
+                        sheetName: sheetName,
+                        dateStr: dateStr
+                    })
+                });
+
+                statusLabel.innerText = "✅ บันทึกสำเร็จ!";
+                Swal.fire({
+                    icon: 'success',
+                    title: 'บันทึกเรียบร้อย',
+                    text: 'ข้อมูลภาพถูกส่งไปยัง Google Drive แล้ว',
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    // ปิดหน้าต่างหลังจากบันทึกเสร็จ (ถ้าเบราว์เซอร์อนุญาต)
+                    // window.close(); 
+                });
+            } catch (err) {
+                statusLabel.innerText = "❌ เกิดข้อผิดพลาดในการส่งข้อมูล";
+                console.error("Upload error:", err);
+            } finally {
+                document.getElementById('captureBtn').disabled = false;
+            }
         };
 
+        // เริ่มทำงานเมื่อโหลดหน้า
         initCamera();
     </script>
 </body>
