@@ -9,120 +9,136 @@
 </head>
 <body class="bg-dark text-white text-center">
     <div class="container py-5">
-        <h4>ถ่ายรูปสำหรับเตา: <span id="displaySheet">กำลังโหลด...</span></h4>
-        <video id="video" autoplay playsinline class="w-100 rounded mb-3" style="max-width: 500px; background: #000;"></video>
-        <canvas id="canvas" style="display:none;"></canvas>
-        
-        <div class="d-grid gap-2 col-8 mx-auto">
-            <button id="captureBtn" class="btn btn-danger btn-lg rounded-pill">ถ่ายรูปและบันทึก</button>
-            <button onclick="window.close()" class="btn btn-outline-light">กลับหน้าหลัก</button>
+        <div id="main-ui">
+            <h4>ถ่ายรูปสำหรับเตา: <span id="displaySheet" class="text-warning">กำลังโหลด...</span></h4>
+            <video id="video" autoplay playsinline class="w-100 rounded mb-3" style="max-width: 500px; background: #000;"></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            
+            <div class="d-grid gap-2 col-8 mx-auto">
+                <button id="captureBtn" class="btn btn-danger btn-lg rounded-pill">ถ่ายรูปและบันทึก</button>
+                <button onclick="window.close()" class="btn btn-outline-light">กลับหน้าหลัก</button>
+            </div>
         </div>
-        <p id="status" class="mt-3"></p>
+        <p id="status" class="mt-3 text-secondary small"></p>
     </div>
 
     <script>
-	
-	function isLineApp() {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    return (ua.indexOf("Line") > -1);
-}
-        // ประกาศตัวแปร Global เพื่อให้เข้าถึงได้ทุกที่
         let GAS_URL = "";
         let sheetName = "";
         let dateStr = "";
 
-        // ฟังก์ชันเริ่มต้นกล้อง
+        function isLineApp() {
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            return (ua.indexOf("Line") > -1);
+        }
+
         async function initCamera() {
             const statusElem = document.getElementById('status');
             try {
                 const constraints = {
-                    video: { facingMode: { ideal: "environment" } }, // บังคับกล้องหลัง
+                    video: { facingMode: { ideal: "environment" } },
                     audio: false
                 };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const video = document.getElementById('video');
                 if (video) video.srcObject = stream;
-                if (statusElem) statusElem.innerText = "📷 กล้องพร้อมใช้งาน (กล้องหลัง)";
+                statusElem.innerText = "📷 กล้องพร้อมใช้งาน (กล้องหลัง)";
             } catch (err) {
                 console.error(err);
-                if (statusElem) statusElem.innerText = "❌ ไม่สามารถเปิดกล้องได้: " + err.message;
+                statusElem.innerText = "❌ ไม่สามารถเปิดกล้องได้: " + err.message;
+                Swal.fire('กล้องมีปัญหา', 'กรุณาตรวจสอบการอนุญาตเข้าถึงกล้อง', 'error');
             }
         }
 
-        // ใช้ window.onload เพื่อรอให้ HTML ทั้งหมด (รวมถึงปุ่ม) โหลดเสร็จก่อน
         window.onload = function() {
-    // 1. เช็คว่าเปิดใน LINE หรือไม่
-    if (isLineApp()) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'กรุณาเปิดด้วยเบราว์เซอร์ปกติ',
-            html: `เบราว์เซอร์ของ LINE ไม่รองรับการเปิดกล้อง<br><br>
-                   <b>วิธีแก้ไข:</b><br>
-                   1. กดที่ปุ่ม <b>"จุดสามจุด" (⋮ หรือ ⋯)</b> ที่มุมล่างขวา<br>
-                   2. เลือก <b>"เปิดด้วยเบราว์เซอร์เริ่มต้น"</b> หรือ <b>"Open in Browser"</b>`,
-            confirmButtonText: 'รับทราบ',
-            confirmButtonColor: '#d33',
-            allowOutsideClick: false
-        });
-        
-        document.getElementById('status').innerHTML = "<span class='text-warning'>⚠️ โปรดเปิดใน Chrome หรือ Safari เพื่อใช้งานกล้อง</span>";
-        document.getElementById('captureBtn').disabled = true; // ปิดปุ่มถ่ายรูป
-        return; // หยุดการทำงานส่วนอื่น
-    }
-
-    // --- ส่วนดึงค่า URL Parameters และเริ่มกล้องเดิมของคุณ ---
-    const urlParams = new URLSearchParams(window.location.search);
-    sheetName = urlParams.get('sheet') || 'ไม่ระบุชื่อเตา';
-    dateStr = urlParams.get('date') || '';
-    GAS_URL = urlParams.get('gas_url');
-
-    const displayElem = document.getElementById('displaySheet');
-    if (displayElem) displayElem.innerText = sheetName;
-
-    initCamera();
-
-            // 4. กำหนดเหตุการณ์คลิกให้ปุ่ม (จะไม่เป็น null แล้วเพราะรอโหลดหน้าเสร็จ)
-            const captureBtn = document.getElementById('captureBtn');
-            if (captureBtn) {
-                captureBtn.onclick = async function() {
-                    const video = document.getElementById('video');
-                    const canvas = document.getElementById('canvas');
-                    const statusElem = document.getElementById('status');
-
-                    if (!video || !video.videoWidth || !GAS_URL) {
-                        alert("กล้องไม่พร้อมหรือไม่มี GAS URL");
-                        return;
-                    }
-
-                    // วาดภาพ
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    canvas.getContext('2d').drawImage(video, 0, 0);
-                    
-                    const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-                    if (statusElem) statusElem.innerText = "⏳ กำลังบันทึกลง Drive...";
-                    captureBtn.disabled = true;
-
-                    try {
-                        await fetch(GAS_URL, {
-                            method: 'POST',
-                            mode: 'no-cors',
-                            body: JSON.stringify({
-                                image: imageData,
-                                sheetName: sheetName,
-                                dateStr: dateStr
-                            })
-                        });
-                        if (statusElem) statusElem.innerText = "✅ บันทึกสำเร็จ!";
-                        Swal.fire({ icon: 'success', title: 'บันทึกเรียบร้อย', timer: 2000 });
-                    } catch (e) {
-                        if (statusElem) statusElem.innerText = "❌ เกิดข้อผิดพลาด";
-                        console.error(e);
-                    } finally {
-                        captureBtn.disabled = false;
-                    }
-                };
+            // 1. ตรวจสอบ LINE App
+            if (isLineApp()) {
+                document.getElementById('main-ui').style.display = 'none';
+                document.getElementById('status').innerHTML = "⚠️ โปรดเปิดใน Chrome หรือ Safari";
+                
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรุณาเปิดด้วยเบราว์เซอร์ปกติ',
+                    html: `เบราว์เซอร์ของ LINE ไม่รองรับการใช้งานกล้องในระบบนี้<br><br>
+                           <b>วิธีแก้ไข:</b><br>
+                           1. กดปุ่ม <b>"จุดสามจุด" (⋮ หรือ ⋯)</b><br>
+                           2. เลือก <b>"เปิดด้วยเบราว์เซอร์เริ่มต้น"</b>`,
+                    confirmButtonText: 'ตกลง',
+                    confirmButtonColor: '#d33',
+                    allowOutsideClick: false
+                });
+                return;
             }
+
+            // 2. ดึงค่า Parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            sheetName = urlParams.get('sheet') || 'ไม่ระบุชื่อเตา';
+            dateStr = urlParams.get('date') || '';
+            GAS_URL = urlParams.get('gas_url');
+
+            document.getElementById('displaySheet').innerText = sheetName;
+
+            // 3. เริ่มกล้อง
+            initCamera();
+
+            // 4. การจัดการปุ่มถ่ายรูป
+            const captureBtn = document.getElementById('captureBtn');
+            captureBtn.onclick = async function() {
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                const statusElem = document.getElementById('status');
+
+                if (!video.videoWidth || !GAS_URL) {
+                    Swal.fire('ผิดพลาด', 'กล้องยังไม่พร้อม หรือข้อมูล URL ไม่ถูกต้อง', 'error');
+                    return;
+                }
+
+                captureBtn.disabled = true;
+                statusElem.innerText = "⏳ กำลังประมวลผลภาพ...";
+
+                // --- ส่วนการ Resize ภาพ (ป้องกันไฟล์ใหญ่เกินไป) ---
+                const maxWidth = 1000; // ปรับขนาดภาพให้กว้างไม่เกิน 1000px
+                const scale = maxWidth / video.videoWidth;
+                canvas.width = maxWidth;
+                canvas.height = video.videoHeight * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // แปลงเป็น JPG (คุณภาพ 0.7 ช่วยให้ไฟล์เล็กลงมากแต่ภาพยังชัด)
+                const imageData = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+
+                statusElem.innerText = "⏳ กำลังบันทึกลง Google Drive...";
+
+                try {
+                    // ใช้ fetch ส่งข้อมูล
+                    await fetch(GAS_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // สำคัญสำหรับ GAS
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image: imageData,
+                            sheetName: sheetName,
+                            dateStr: dateStr
+                        })
+                    });
+
+                    statusElem.innerText = "✅ บันทึกสำเร็จ!";
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'บันทึกรูปภาพเรียบร้อย', 
+                        timer: 2000,
+                        showConfirmButton: false 
+                    });
+
+                } catch (e) {
+                    statusElem.innerText = "❌ เกิดข้อผิดพลาดในการส่งข้อมูล";
+                    console.error(e);
+                    Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับ Server ได้', 'error');
+                } finally {
+                    captureBtn.disabled = false;
+                }
+            };
         };
     </script>
 </body>
