@@ -21,6 +21,11 @@
     </div>
 
     <script>
+	
+	function isLineApp() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    return (ua.indexOf("Line") > -1);
+}
         // ประกาศตัวแปร Global เพื่อให้เข้าถึงได้ทุกที่
         let GAS_URL = "";
         let sheetName = "";
@@ -46,18 +51,35 @@
 
         // ใช้ window.onload เพื่อรอให้ HTML ทั้งหมด (รวมถึงปุ่ม) โหลดเสร็จก่อน
         window.onload = function() {
-            // 1. ดึงค่าจาก URL Parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            sheetName = urlParams.get('sheet') || 'ไม่ระบุชื่อเตา';
-            dateStr = urlParams.get('date') || '';
-            GAS_URL = urlParams.get('gas_url');
+    // 1. เช็คว่าเปิดใน LINE หรือไม่
+    if (isLineApp()) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'กรุณาเปิดด้วยเบราว์เซอร์ปกติ',
+            html: `เบราว์เซอร์ของ LINE ไม่รองรับการเปิดกล้อง<br><br>
+                   <b>วิธีแก้ไข:</b><br>
+                   1. กดที่ปุ่ม <b>"จุดสามจุด" (⋮ หรือ ⋯)</b> ที่มุมขวาบน<br>
+                   2. เลือก <b>"เปิดด้วยเบราว์เซอร์เริ่มต้น"</b> หรือ <b>"Open in Browser"</b>`,
+            confirmButtonText: 'รับทราบ',
+            confirmButtonColor: '#d33',
+            allowOutsideClick: false
+        });
+        
+        document.getElementById('status').innerHTML = "<span class='text-warning'>⚠️ โปรดเปิดใน Chrome หรือ Safari เพื่อใช้งานกล้อง</span>";
+        document.getElementById('captureBtn').disabled = true; // ปิดปุ่มถ่ายรูป
+        return; // หยุดการทำงานส่วนอื่น
+    }
 
-            // 2. แสดงชื่อเตา
-            const displayElem = document.getElementById('displaySheet');
-            if (displayElem) displayElem.innerText = sheetName;
+    // --- ส่วนดึงค่า URL Parameters และเริ่มกล้องเดิมของคุณ ---
+    const urlParams = new URLSearchParams(window.location.search);
+    sheetName = urlParams.get('sheet') || 'ไม่ระบุชื่อเตา';
+    dateStr = urlParams.get('date') || '';
+    GAS_URL = urlParams.get('gas_url');
 
-            // 3. เริ่มต้นกล้อง
-            initCamera();
+    const displayElem = document.getElementById('displaySheet');
+    if (displayElem) displayElem.innerText = sheetName;
+
+    initCamera();
 
             // 4. กำหนดเหตุการณ์คลิกให้ปุ่ม (จะไม่เป็น null แล้วเพราะรอโหลดหน้าเสร็จ)
             const captureBtn = document.getElementById('captureBtn');
